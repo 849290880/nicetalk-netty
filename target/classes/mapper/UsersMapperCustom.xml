@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.hai.mapper.UsersMapperCustom">
+ 	
+ 	<select id="queryRequestByUserId" resultType="com.hai.pojo.vo.SendRequestUser" parameterType="String">
+ 		select u.id as id,u.username as username,
+ 			   u.face_image as faceImage,
+    		   u.nickname as nickname
+ 		from friends_request fr
+ 		left join users u
+ 		on fr.send_user_id = u.id
+ 		where fr.accept_user_id = #{acceptUserId};
+ 	</select>
+</mapper>

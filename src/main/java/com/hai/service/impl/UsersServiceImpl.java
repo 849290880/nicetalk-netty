@@ -11,13 +11,19 @@ import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
+import com.hai.enums.MsgSignFlagEnum;
+import com.hai.mapper.ChatMsgMapper;
+import com.hai.mapper.ChatMsgMapperCustom;
 import com.hai.mapper.FriendsRequestMapper;
 import com.hai.mapper.MyFriendsMapper;
 import com.hai.mapper.UsersMapper;
 import com.hai.mapper.UsersMapperCustom;
+import com.hai.netty.pojo.ChatMsgEntity;
+import com.hai.pojo.ChatMsg;
 import com.hai.pojo.FriendsRequest;
 import com.hai.pojo.MyFriends;
 import com.hai.pojo.Users;
+import com.hai.pojo.vo.FriendsVO;
 import com.hai.pojo.vo.SendRequestUser;
 import com.hai.service.UsersService;
 import com.hai.util.FastDFSClient;
@@ -37,6 +43,11 @@ public class UsersServiceImpl implements UsersService {
 	@Autowired
 	private UsersMapperCustom usersMapperCustom;
 	
+	@Autowired
+	private ChatMsgMapper chatMsgMapper;
+	
+	@Autowired
+	private ChatMsgMapperCustom chatMsgMapperCustom;
 	
 	@Autowired
 	private QRCodeUtils qrCodeUtils;
@@ -162,9 +173,58 @@ public class UsersServiceImpl implements UsersService {
 		return JSONResult.ok("已发送请求啦!");
 	}
 
+	@Transactional(propagation=Propagation.SUPPORTS)
 	@Override
 	public List<SendRequestUser> queryRequestByUserId(String acceptUserId) {
 		
 		return usersMapperCustom.queryRequestByUserId(acceptUserId);
+	}
+
+	@Transactional(propagation=Propagation.REQUIRED)
+	@Override
+	public void ignoreRequest(String friendsId, String userId) {
+		Example example = new Example(FriendsRequest.class);
+		Criteria criteria = example.createCriteria();
+		criteria.andEqualTo("sendUserId", friendsId);
+		criteria.andEqualTo("acceptUserId", userId);
+		friendsRequestMapper.deleteByExample(example);
+	}
+
+	@Transactional(propagation=Propagation.REQUIRED)
+	@Override
+	public void agree(String friendsId, String userId) {
+		//1.好友增加两条记录，互增加好友记录
+		addRelationShip(userId,friendsId);
+		addRelationShip(friendsId,userId);
+		//2.删除好友请求记录
+		ignoreRequest(friendsId,userId);
+	}
+
+	@Transactional(propagation=Propagation.SUPPORTS)
+	@Override
+	public List<FriendsVO> queryFriendsById(String userId) {
+		List<FriendsVO> list = usersMapperCustom.selectFriendsVOById(userId);
+		return list;
+	}
+
+	@Transactional(propagation=Propagation.REQUIRED)
+	@Override
+	public String saveMsg(ChatMsgEntity chatMsgEntity) {
+		ChatMsg chatMsg = new ChatMsg();
+		chatMsg.setId(sid.nextShort());
+		chatMsg.setMsg(chatMsgEntity.getMsg());
+		chatMsg.setSendUserId(chatMsgEntity.getSenderId());
+		chatMsg.setAcceptUserId(chatMsgEntity.getReceiverId());
+		chatMsg.setSignFlag(MsgSignFlagEnum.unsign.type);
+		chatMsg.setCreateTime(new Date());
+		
+		chatMsgMapper.insert(chatMsg);
+		return chatMsg.getId();
+	}
+
+	@Transactional(propagation=Propagation.REQUIRED)
+	@Override
+	public void batchSignChatMsg(List<String> idsList) {
+		chatMsgMapperCustom.batchUpdateMsgStatus(idsList);
 	}
 }

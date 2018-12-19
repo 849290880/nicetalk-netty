@@ -12,10 +12,12 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
 
+import com.hai.enums.RequestOperationType;
 import com.hai.enums.SearchFriendStatus;
 import com.hai.pojo.MyFriends;
 import com.hai.pojo.Users;
 import com.hai.pojo.bo.UsersBO;
+import com.hai.pojo.vo.FriendsVO;
 import com.hai.pojo.vo.SendRequestUser;
 import com.hai.pojo.vo.UsersVO;
 import com.hai.service.UsersService;
@@ -269,4 +271,55 @@ public class UserController {
 		List<SendRequestUser> list = usersService.queryRequestByUserId(userId);
 		return JSONResult.ok(list);
 	}
+	
+	/**
+	 * 
+	 * @param friendsId
+	 * @param userId
+	 * @param operType
+	 * @return
+	 * @Description: 根据操作类型通过好友申请，或者忽略好友申请，operType：-1为忽略 operType：1通过
+	 */
+	@PostMapping("/handlerAddRequest")
+	public JSONResult handlerAddRequest(String friendsId,String userId,Integer operType) {
+		//1.非法客户端接口调用
+		if(StringUtils.isBlank(friendsId)||StringUtils.isBlank(friendsId)
+				||operType==null||StringUtils.isBlank(RequestOperationType.getMsgByKey(operType))) {
+			return JSONResult.errorMsg("");
+		}
+		//2.判断操作类型，-1为忽略 1为通过
+		//忽略
+		if(RequestOperationType.IGNORE.operType==operType) {
+			usersService.ignoreRequest(friendsId,userId);
+		}
+		//3.通过
+		if(RequestOperationType.AGREE.operType==operType) {
+			usersService.agree(friendsId,userId);
+		}
+		//4.返回内容，更新通讯录
+		List<FriendsVO> list = usersService.queryFriendsById(userId);
+		return JSONResult.ok(list);
+	}
+	
+	
+	/**
+	 * 
+	 * @param userId
+	 * @return
+	 * @Description: 根据用户ID查询所有的好友
+	 */
+	@PostMapping("/queryFriends")
+	public JSONResult queryFriends(String userId) {
+		
+		if(StringUtils.isBlank(userId)) {
+			return JSONResult.errorMsg("");
+		}
+		//查询所有的好友
+		List<FriendsVO> list = usersService.queryFriendsById(userId);
+		
+		return JSONResult.ok(list);
+	}
+	
+	
+	
 }

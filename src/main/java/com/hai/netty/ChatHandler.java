@@ -1,6 +1,17 @@
 package com.hai.netty;
 
-import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.List;
+
+import org.apache.commons.lang3.StringUtils;
+
+import com.hai.SpringUtil;
+import com.hai.enums.MsgActionEnum;
+import com.hai.netty.pojo.ChannelUserIdRel;
+import com.hai.netty.pojo.ChatMsgEntity;
+import com.hai.netty.pojo.DataContent;
+import com.hai.service.UsersService;
+import com.hai.util.JsonUtils;
 
 import io.netty.channel.Channel;
 import io.netty.channel.ChannelHandlerContext;
@@ -18,17 +29,69 @@ import io.netty.util.concurrent.GlobalEventExecutor;
 public class ChatHandler extends SimpleChannelInboundHandler<TextWebSocketFrame>{
 
 	//用于记录和管理所有客户端的channel
-	private static ChannelGroup clients = new DefaultChannelGroup(GlobalEventExecutor.INSTANCE);
+	private static ChannelGroup users = new DefaultChannelGroup(GlobalEventExecutor.INSTANCE);
 	
 	@Override
-	protected void channelRead0(ChannelHandlerContext ctx, TextWebSocketFrame msg) throws Exception {
+	protected void channelRead0(ChannelHandlerContext ct2x, TextWebSocketFrame msg) throws Exception {
 		//获取客户端发送的消息
 		String content = msg.text();
-		System.out.println("接收到的数据: "+content);
 		
-		clients.writeAndFlush(new TextWebSocketFrame("[服务器接收到消息:]"+LocalDateTime.now()+
-				",消息为"+content));
+		Channel curChannel = ct2x.channel();
 		
+		//1.获取客户端发来的消息
+		DataContent dataContent = JsonUtils.jsonToPojo(content, DataContent.class);
+		Integer action = dataContent.getAction();
+		//2.判断消息类型，根据不同的类型来处理不同的业务
+		
+		if(action == MsgActionEnum.CONNECT.type) {
+			// 2.1当websocket 第一次open的时候，初始化channel，把用户的id和channel关联起来
+			String senderId = dataContent.getChatMsgEntity().getSenderId();
+			// 将用户id和当前的channel关联起来
+			ChannelUserIdRel.put(senderId, curChannel);
+		}else if(action == MsgActionEnum.CHAT.type) {
+			// 2.2聊天的消息保存在数据库当中，同时标记消息的签收状态，标记为[未签收]
+			ChatMsgEntity chatMsgEntity = dataContent.getChatMsgEntity();
+			
+			UsersService userService = SpringUtil.getBean("userServiceImpl", UsersService.class);
+			String msgId = userService.saveMsg(chatMsgEntity);
+			chatMsgEntity.setMsgId(msgId);
+			
+			//消息转发或者推送
+			Channel channel = ChannelUserIdRel.get(chatMsgEntity.getReceiverId());
+			if(channel!=null) {
+				Channel findChannel = users.find(channel.id());
+				if(findChannel!=null) {
+					findChannel.writeAndFlush(new TextWebSocketFrame(JsonUtils.objectToJson(chatMsgEntity)));
+				}else {
+					//用户和netty服务没有连接，消息推送
+					
+				}
+			}else {
+				//该用户没有和没有注册到map表上，等于没有上线，消息推送( JPush,个推，小米 )
+			}
+		}else if(action == MsgActionEnum.SIGNED.type) {
+			// 2.3签收消息的类型，根据不同的消息进行签收，修改数据库的内容为[已签收]
+			String ids = dataContent.getExtand();
+			String[] idsArray = ids.split(",");
+			List<String> idsList = new ArrayList<>();
+			
+			for (String idMsg : idsArray) {
+				if(StringUtils.isNotBlank(idMsg)) {
+					idsList.add(idMsg);
+				}
+			}
+			
+			System.out.println(idsList);
+			
+			if(idsList!=null && !idsList.isEmpty()&& idsList.size() > 0) {
+				UsersService userService = SpringUtil.getBean("userServiceImpl", UsersService.class);
+				userService.batchSignChatMsg(idsList);
+			}
+			
+		}else if(action == MsgActionEnum.KEEPALIVE.type) {
+			// 2.5心跳机制的消息
+			
+		}
 	}
 
 	/**
@@ -38,17 +101,20 @@ public class ChatHandler extends SimpleChannelInboundHandler<TextWebSocketFrame>
 	@Override
 	public void handlerAdded(ChannelHandlerContext ctx) throws Exception {
 		Channel channel = ctx.channel();
-		clients.add(channel);
+		users.add(channel);
 	}
 
 	@Override
 	public void handlerRemoved(ChannelHandlerContext ctx) throws Exception {
 		//当触发handlerRemoved，ChannelGroup会自动移除对应客户端的channel
-//		clients.remove(ctx.channel());
-		System.out.println("客户端断开,channel对应的长Id为:"+ctx.channel().id().asLongText());
-		System.out.println("客户端断开,channel对应的短Id为:"+ctx.channel().id().asShortText());
+		users.remove(ctx.channel());
 	}
 	
 	
+	@Override
+	public void exceptionCaught(ChannelHandlerContext ctx, Throwable cause) throws Exception {
+		ctx.channel().close();
+		users.remove(ctx.channel());
+	}
 
 }

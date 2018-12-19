@@ -11,4 +11,18 @@
  		on fr.send_user_id = u.id
  		where fr.accept_user_id = #{acceptUserId};
  	</select>
+ 	
+ 	<select id="selectFriendsVOById" resultType="com.hai.pojo.vo.FriendsVO" parameterType="String">
+ 		select 
+	 		u.id as id,
+	 		u.username as username,
+	 		u.face_image as faceImage,
+	 		u.nickname as nickname
+ 		from my_friends mf
+ 		left join 
+ 		users u
+ 		on mf.my_friend_user_id = u.id
+ 		where mf.my_user_id = #{userId}
+ 	</select>
+ 	
 </mapper>

@@ -48,11 +48,20 @@ public class ChatHandler extends SimpleChannelInboundHandler<TextWebSocketFrame>
 			String senderId = dataContent.getChatMsgEntity().getSenderId();
 			// 将用户id和当前的channel关联起来
 			ChannelUserIdRel.put(senderId, curChannel);
+			
+			//打印users所有的channel
+			for(Channel c: users) {
+				System.out.println("channelId为:" + c.id().asLongText());
+			}
+			
+			//测试打印 map中的内容
+			ChannelUserIdRel.output();
+			
 		}else if(action == MsgActionEnum.CHAT.type) {
 			// 2.2聊天的消息保存在数据库当中，同时标记消息的签收状态，标记为[未签收]
 			ChatMsgEntity chatMsgEntity = dataContent.getChatMsgEntity();
 			
-			UsersService userService = SpringUtil.getBean("userServiceImpl", UsersService.class);
+			UsersService userService = SpringUtil.getBean("usersServiceImpl", UsersService.class);
 			String msgId = userService.saveMsg(chatMsgEntity);
 			chatMsgEntity.setMsgId(msgId);
 			
@@ -84,8 +93,9 @@ public class ChatHandler extends SimpleChannelInboundHandler<TextWebSocketFrame>
 			System.out.println(idsList);
 			
 			if(idsList!=null && !idsList.isEmpty()&& idsList.size() > 0) {
-				UsersService userService = SpringUtil.getBean("userServiceImpl", UsersService.class);
+				UsersService userService = SpringUtil.getBean("usersServiceImpl", UsersService.class);
 				userService.batchSignChatMsg(idsList);
+				System.err.println(userService.getClass().getName());
 			}
 			
 		}else if(action == MsgActionEnum.KEEPALIVE.type) {

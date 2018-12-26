@@ -9,13 +9,15 @@ public class DataContent implements Serializable{
 
 	private Integer action; 	// 动作类型
 	private ChatMsgEntity chatMsgEntity;	// 用户的聊天内容entity
+	private String extand;		//扩展字段
+	
+	
 	public ChatMsgEntity getChatMsgEntity() {
 		return chatMsgEntity;
 	}
 	public void setChatMsgEntity(ChatMsgEntity chatMsgEntity) {
 		this.chatMsgEntity = chatMsgEntity;
 	}
-	private String extand;		//扩展字段
 	public Integer getAction() {
 		return action;
 	}

@@ -15,4 +15,14 @@ public class ChannelUserIdRel {
 	public static Channel get(String userId) {
 		return map.get(userId);
 	}
+	
+	/**
+	 * @Description: 用于测试，查看map中的数据
+	 */
+	public static void output() {
+		for(HashMap.Entry<String,Channel> entry: map.entrySet()) {
+			System.out.println("用户的id" + entry.getKey() 
+						+"\nchannel的id" + entry.getValue().id().asLongText());
+		}
+	}
 }
